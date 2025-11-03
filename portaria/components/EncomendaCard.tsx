@@ -1,34 +1,64 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 
-interface Props {
-  nome: string;
-  data: string;
-  status: string;
-}
+export default function EncomendaCard({ item, onEdit, onDelete }) {
+  function formatarData(dataString?: string) {
+    if (!dataString) return "—";
+    try {
+      const d = new Date(dataString);
+      return d.toLocaleString("pt-BR");
+    } catch {
+      return "—";
+    }
+  }
 
-export default function EncomendaCard({ nome, data, status }: Props) {
   return (
     <View style={styles.card}>
-      <View>
-        <Text style={styles.nome}>{nome}</Text>
-        <Text style={styles.data}>{data}</Text>
+      <Text style={styles.text}>
+        <Text style={styles.bold}>Token:</Text> {item.token || "—"}{" "}
+        | <Text style={styles.bold}>Origem:</Text> {item.origem || "—"}
+      </Text>
+      <Text style={styles.text}>
+        <Text style={styles.bold}>Morador:</Text>{" "}
+        {item.morador?.nome || "—"}
+      </Text>
+      <Text style={styles.text}>
+        🕒 Recebida em: {formatarData(item.dataRecebimento)}
+      </Text>
+      {item.retiradaEm && (
+        <Text style={styles.text}>
+          ✅ Retirada em: {formatarData(item.retiradaEm)}
+        </Text>
+      )}
+      <View style={styles.actions}>
+        <TouchableOpacity onPress={() => onEdit(item)}>
+          <Text style={styles.edit}>Editar</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => onDelete(item)}>
+          <Text style={styles.delete}>Excluir</Text>
+        </TouchableOpacity>
       </View>
-      <Text style={styles.status}>{status}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#f5f7fa",
+    backgroundColor: "#fff",
+    padding: 10,
     borderRadius: 8,
-    padding: 12,
-    marginVertical: 5,
-    flexDirection: "row",
-    justifyContent: "space-between",
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
   },
-  nome: { fontWeight: "bold", fontSize: 15 },
-  data: { fontSize: 13, color: "#777" },
-  status: { backgroundColor: "#C8E6C9", padding: 5, borderRadius: 5, color: "#2E7D32" },
+  text: { color: "#334155", marginVertical: 2 },
+  bold: { fontWeight: "bold" },
+  actions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 6,
+    gap: 10,
+  },
+  edit: { color: "#1d4ed8", fontWeight: "600" },
+  delete: { color: "#b91c1c", fontWeight: "600" },
 });

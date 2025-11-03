@@ -1,19 +1,16 @@
+// components/BotaoAcao.tsx
 import React from "react";
 import { TouchableOpacity, Text, StyleSheet } from "react-native";
 
 type BotaoAcaoProps = {
   titulo: string;
   cor: string;
-  onPress?: () => void; // 👈 adicionado para permitir ação
+  onPress?: () => void;
 };
 
 export default function BotaoAcao({ titulo, cor, onPress }: BotaoAcaoProps) {
   return (
-    <TouchableOpacity
-      style={[styles.botao, { backgroundColor: cor }]}
-      onPress={onPress} // 👈 adiciona o evento de clique
-      activeOpacity={0.8}
-    >
+    <TouchableOpacity style={[styles.botao, { backgroundColor: cor }]} onPress={onPress} activeOpacity={0.8}>
       <Text style={styles.texto}>{titulo}</Text>
     </TouchableOpacity>
   );

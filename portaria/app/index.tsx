@@ -1,20 +1,56 @@
 // app/index.tsx
 import React, { useState, useCallback } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Platform,
+  useWindowDimensions,
+} from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import Sidebar from "../components/Sidebar";
-import { getMoradores, getEncomendas, Encomenda } from "../lib/storage";
+import {
+  getMoradores,
+  getEncomendas,
+  Encomenda,
+  deleteEncomenda,
+} from "../lib/storage";
+import Animated, { FadeInDown } from "react-native-reanimated";
+import { notify } from "../utils/notify";
+
+// 🔧 Helper: formata datas ISO → dd/mm/yyyy hh:mm
+function formatarData(iso?: string) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+}
 
 export default function Home() {
   const [moradoresCount, setMoradoresCount] = useState(0);
   const [encomendas, setEncomendas] = useState<Encomenda[]>([]);
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
 
+  // 🔄 Carregar dados da API
   async function carregar() {
-    const ms = await getMoradores();
-    const es = await getEncomendas();
-    setMoradoresCount(ms.length);
-    setEncomendas(es);
+    try {
+      const moradores = await getMoradores();
+      const encomendas = await getEncomendas();
+      setMoradoresCount(moradores.length);
+      setEncomendas(encomendas);
+    } catch (err) {
+      notify("Erro", "Falha ao carregar dados da API.");
+      console.error("Erro ao carregar:", err);
+    }
   }
 
   useFocusEffect(
@@ -24,73 +60,139 @@ export default function Home() {
   );
 
   const totalRetiradas = encomendas.filter((e) => e.retirada).length;
-
   const recentes = [...encomendas]
-    .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
+    .sort((a, b) => {
+      const ta = new Date(a.dataRegistro ?? a.dataRecebimento ?? 0).getTime();
+      const tb = new Date(b.dataRegistro ?? b.dataRecebimento ?? 0).getTime();
+      return tb - ta;
+    })
     .slice(0, 5);
+
+  // 🗑 Excluir encomenda
+  async function confirmarExcluirEncomenda(id: string | number) {
+    const ok =
+      Platform.OS === "web"
+        ? window.confirm("Deseja excluir essa encomenda?")
+        : true;
+
+    if (!ok) return;
+
+    try {
+      await deleteEncomenda(id);
+      notify("Sucesso", "Encomenda excluída.");
+      carregar();
+    } catch (err) {
+      console.error(err);
+      notify("Erro", "Falha ao excluir encomenda.");
+    }
+  }
 
   return (
     <View style={styles.container}>
       <Sidebar />
-      <View style={styles.areaConteudo}>
+      <View
+        style={[
+          styles.areaConteudo,
+          { paddingTop: Platform.OS === "android" ? 60 : 80 },
+        ]}
+      >
         <Text style={styles.titulo}>Painel da Portaria</Text>
-        <Text style={styles.subtitulo}>Bem-vindo! Veja abaixo o resumo do sistema.</Text>
+        <Text style={styles.subtitulo}>
+          Bem-vindo! Veja abaixo o resumo do sistema.
+        </Text>
 
-        <View style={styles.cardsContainer}>
-          <View style={[styles.card, { backgroundColor: "#1976d2" }]}>
-            <Text style={styles.cardTitulo}>Moradores</Text>
-            <Text style={styles.cardValor}>{moradoresCount}</Text>
-          </View>
-
-          <View style={[styles.card, { backgroundColor: "#2e7d32" }]}>
-            <Text style={styles.cardTitulo}>Encomendas</Text>
-            <Text style={styles.cardValor}>{encomendas.length}</Text>
-          </View>
-
-          <View style={[styles.card, { backgroundColor: "#8e24aa" }]}>
-            <Text style={styles.cardTitulo}>Retiradas</Text>
-            <Text style={styles.cardValor}>{totalRetiradas}</Text>
-          </View>
+        {/* 📊 Cards do topo */}
+        <View
+          style={[
+            styles.cardsContainer,
+            isMobile && { flexDirection: "column" },
+          ]}
+        >
+          {[
+            { titulo: "Moradores", valor: moradoresCount, cor: "#1976d2" },
+            { titulo: "Encomendas", valor: encomendas.length, cor: "#2e7d32" },
+            { titulo: "Retiradas", valor: totalRetiradas, cor: "#8e24aa" },
+          ].map((c, i) => (
+            <Animated.View
+              key={c.titulo}
+              entering={FadeInDown.delay(i * 150).duration(600).springify()}
+              style={[
+                styles.card,
+                { backgroundColor: c.cor },
+                isMobile && { marginBottom: 10 },
+              ]}
+            >
+              <Text style={styles.cardTitulo}>{c.titulo}</Text>
+              <Text style={styles.cardValor}>{c.valor}</Text>
+            </Animated.View>
+          ))}
         </View>
 
+        {/* 📦 Lista de encomendas */}
         <Text style={styles.secaoTitulo}>📦 Encomendas Recentes</Text>
-
         {recentes.length === 0 ? (
           <Text style={styles.vazio}>Nenhuma encomenda registrada ainda.</Text>
         ) : (
           <FlatList
             data={recentes}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <View style={styles.item}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                  <Text style={styles.itemTexto}>
-                    <Text style={styles.bold}>Token:</Text> {item.token}{" "}
-                    <Text style={styles.bold}>| Origem:</Text> {item.origem}
-                  </Text>
+            keyExtractor={(item) => String(item.id)}
+            renderItem={({ item }) => {
+              const nomeMorador = item.morador
+                ? `${item.morador.nome} ${item.morador.sobrenome}`
+                : "—";
+              const dataRef =
+                item.retiradaEm || item.dataRegistro || item.dataRecebimento;
 
-                  <View style={{ flexDirection: "row" }}>
-                    <TouchableOpacity
-                      style={styles.actionBtn}
-                      onPress={() => router.push(`/encomendas/registrar?editId=${item.id}`)}
-                    >
-                      <Text style={styles.actionText}>Editar</Text>
-                    </TouchableOpacity>
+              return (
+                <View style={styles.item}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.itemTexto}>
+                        <Text style={styles.bold}>Token:</Text>{" "}
+                        {item.token || "—"}{" "}
+                        <Text style={styles.bold}>| Origem:</Text>{" "}
+                        {item.origem || "—"}
+                      </Text>
 
-                    <TouchableOpacity
-                      style={[styles.actionBtn, { marginLeft: 8 }]}
-                      onPress={() => router.push(`/encomendas/registrar?deleteId=${item.id}`)}
-                    >
-                      <Text style={styles.actionText}>Excluir</Text>
-                    </TouchableOpacity>
+                      <Text style={[styles.itemData, { marginTop: 6 }]}>
+                        <Text style={styles.bold}>Morador:</Text>{" "}
+                        {nomeMorador || "—"}
+                      </Text>
+                    </View>
+
+                    <View style={{ flexDirection: "row", marginLeft: 8 }}>
+                      <TouchableOpacity
+                        style={styles.actionBtn}
+                        onPress={() =>
+                          router.push(`/encomendas/registrar?editId=${item.id}`)
+                        }
+                      >
+                        <Text style={styles.actionText}>Editar</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { marginLeft: 8 }]}
+                        onPress={() => confirmarExcluirEncomenda(item.id)}
+                      >
+                        <Text style={styles.actionText}>Excluir</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
 
-                <Text style={styles.itemData}>
-                  {item.retirada ? `✅ Retirada em ${item.retiradaEm}` : `⏳ Recebida em ${item.data}`}
-                </Text>
-              </View>
-            )}
+                  <Text style={styles.itemData}>
+                    {item.retirada
+                      ? `✅ Retirada em ${formatarData(item.retiradaEm)}`
+                      : `⏳ Recebida em ${formatarData(dataRef)}`}
+                  </Text>
+                </View>
+              );
+            }}
           />
         )}
       </View>
@@ -103,11 +205,26 @@ const styles = StyleSheet.create({
   areaConteudo: { flex: 1, padding: 20 },
   titulo: { fontSize: 22, fontWeight: "bold", color: "#0d47a1" },
   subtitulo: { color: "#475569", marginBottom: 20 },
-  cardsContainer: { flexDirection: "row", justifyContent: "space-between", marginBottom: 20 },
-  card: { flex: 1, marginRight: 10, padding: 20, borderRadius: 12, alignItems: "center" },
+  cardsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  card: {
+    flex: 1,
+    marginRight: 10,
+    padding: 20,
+    borderRadius: 12,
+    alignItems: "center",
+  },
   cardTitulo: { color: "#fff", fontSize: 16 },
   cardValor: { color: "#fff", fontSize: 28, fontWeight: "bold" },
-  secaoTitulo: { fontSize: 18, fontWeight: "bold", color: "#0d47a1", marginBottom: 10 },
+  secaoTitulo: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#0d47a1",
+    marginBottom: 10,
+  },
   vazio: { color: "#475569" },
   item: {
     backgroundColor: "#fff",
@@ -120,6 +237,11 @@ const styles = StyleSheet.create({
   itemTexto: { fontSize: 15, color: "#1e293b" },
   bold: { fontWeight: "bold" },
   itemData: { color: "#475569", marginTop: 8, fontSize: 13 },
-  actionBtn: { paddingHorizontal: 8, paddingVertical: 4, backgroundColor: "#e6eef8", borderRadius: 6 },
+  actionBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: "#e6eef8",
+    borderRadius: 6,
+  },
   actionText: { color: "#0d47a1", fontWeight: "600", fontSize: 13 },
 });

@@ -1,164 +1,153 @@
-import React, { useState, useEffect } from "react";
+// app/encomendas/registrar.tsx
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
-  StyleSheet,
-  TouchableOpacity,
   TextInput,
+  TouchableOpacity,
+  StyleSheet,
   ScrollView,
   Alert,
+  FlatList,
+  useWindowDimensions,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import Sidebar from "../../components/Sidebar";
-
-type Morador = {
-  id: string;
-  nome: string;
-  sobrenome: string;
-  bloco: string;
-  apartamento: string;
-  telefone: string;
-};
-
-type Encomenda = {
-  id: string;
-  moradorId: string;
-  origem: string;
-  token: string;
-  data: string;
-};
+import {
+  getMoradores,
+  getEncomendas,
+  saveEncomendas,
+  updateEncomenda,
+  getEncomendaById,
+  Encomenda,
+  Morador,
+} from "../../lib/storage";
 
 export default function RegistrarEncomenda() {
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  const editId = params.editId as string | undefined;
+
   const [moradores, setMoradores] = useState<Morador[]>([]);
-  const [moradorSelecionado, setMoradorSelecionado] = useState("");
-  const [origem, setOrigem] = useState("");
   const [encomendas, setEncomendas] = useState<Encomenda[]>([]);
+  const [selectedMoradorId, setSelectedMoradorId] = useState<string>("");
+  const [origem, setOrigem] = useState("");
+  const [descricao, setDescricao] = useState("");
+  const [filtro, setFiltro] = useState("");
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
 
-  // 🔄 Carregar moradores e encomendas salvas
   useEffect(() => {
-    async function carregarDados() {
-      try {
-        const jsonMoradores = await AsyncStorage.getItem("@moradores");
-        if (jsonMoradores) setMoradores(JSON.parse(jsonMoradores));
-
-        const jsonEncomendas = await AsyncStorage.getItem("@encomendas");
-        if (jsonEncomendas) setEncomendas(JSON.parse(jsonEncomendas));
-      } catch (err) {
-        console.error("Erro ao carregar dados:", err);
-      }
-    }
-    carregarDados();
+    carregar();
   }, []);
 
-  // 💾 Salvar encomendas
-  async function salvarEncomendas(lista: Encomenda[]) {
-    try {
-      await AsyncStorage.setItem("@encomendas", JSON.stringify(lista));
-    } catch (err) {
-      console.error("Erro ao salvar encomendas:", err);
-      Alert.alert("Erro", "Falha ao salvar a encomenda localmente.");
+  useEffect(() => {
+    if (editId) {
+      (async () => {
+        try {
+          const e = await getEncomendaById(editId);
+          setSelectedMoradorId(e.morador ? String(e.morador.id) : "");
+          setOrigem(e.origem || "");
+          setDescricao(e.descricao || "");
+        } catch (err) {
+          console.error(err);
+        }
+      })();
     }
+  }, [editId]);
+
+  async function carregar() {
+    const ms = await getMoradores();
+    setMoradores(ms);
+    const es = await getEncomendas();
+    setEncomendas(es);
   }
 
-  // 🔐 Gerar token
-  function gerarToken(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  }
+  const moradoresFiltraveis = moradores.filter((m) => {
+    const q = filtro.trim().toLowerCase();
+    if (!q) return true;
+    const nomeCompleto = `${m.nome} ${m.sobrenome}`.toLowerCase();
+    return nomeCompleto.includes(q) || m.bloco.toLowerCase().includes(q);
+  });
 
-  // 📨 Registrar encomenda
-  async function handleRegistrar() {
+  async function salvar() {
+    if (!selectedMoradorId) return Alert.alert("Atenção", "Selecione um morador.");
+    if (!origem) return Alert.alert("Atenção", "Preencha a origem.");
     try {
-      if (!moradorSelecionado || !origem) {
-        Alert.alert("Atenção", "Selecione o morador e a origem da encomenda!");
-        return;
+      if (editId) {
+        await updateEncomenda(editId, {
+          moradorId: Number(selectedMoradorId),
+          origem,
+          descricao,
+        });
+        Anlert.alert("Sucesso", "Encomenda atualizada.");
+      } else {
+        await saveEncomendas({
+          moradorId: Number(selectedMoradorId),
+          origem,
+          descricao,
+        });
+        Alert.alert("Sucesso", "Encomenda registrada.");
       }
-
-      const token = gerarToken();
-      const novaEncomenda: Encomenda = {
-        id: Date.now().toString(),
-        moradorId: moradorSelecionado,
-        origem,
-        token,
-        data: new Date().toLocaleString(),
-      };
-
-      const listaAtualizada = [...encomendas, novaEncomenda];
-      setEncomendas(listaAtualizada);
-      await salvarEncomendas(listaAtualizada);
-
-      const morador = moradores.find((m) => m.id === moradorSelecionado);
-      Alert.alert(
-        "Encomenda Registrada",
-        `Encomenda para ${morador?.nome} ${morador?.sobrenome}\nToken: ${token}\n\nNotificação simulada enviada.`
-      );
-
-      setMoradorSelecionado("");
-      setOrigem("");
-    } catch (err) {
-      console.error("Erro ao registrar encomenda:", err);
-      Alert.alert("Erro", "Falha ao registrar encomenda.");
+      router.push("/");
+    } catch (err: any) {
+      console.error(err);
+      Alert.alert("Erro", err.message || "Falha ao salvar encomenda.");
     }
   }
-
-  // 🧾 Moradores agrupados para visualização
-  const moradoresAgrupados = moradores.reduce(
-    (acc: Record<string, Morador[]>, morador) => {
-      const chave = `${morador.bloco}-${morador.apartamento}`;
-      if (!acc[chave]) acc[chave] = [];
-      acc[chave].push(morador);
-      return acc;
-    },
-    {}
-  );
 
   return (
     <View style={styles.container}>
       <Sidebar />
-      <ScrollView style={styles.areaConteudo}>
-        <Text style={styles.titulo}>Registrar Encomenda</Text>
-        <Text style={styles.subtitulo}>
-          Registre uma nova encomenda recebida na portaria
-        </Text>
+      <ScrollView style={[styles.areaConteudo, isMobile && { padding: 16 }]}>
+        <Text style={styles.titulo}>{editId ? "Editar Encomenda" : "Registrar Encomenda"}</Text>
 
-        <Text style={styles.label}>Morador (Destinatário)</Text>
-        <ScrollView style={styles.listaMoradores}>
-          {Object.entries(moradoresAgrupados).map(([chave, lista]) => {
-            const [b, ap] = chave.split("-");
-            return (
-              <View key={chave} style={styles.blocoCard}>
-                <Text style={styles.tituloBloco}>
-                  Bloco {b} - Apto {ap}
-                </Text>
-                {lista.map((m) => (
-                  <TouchableOpacity
-                    key={m.id}
-                    style={[
-                      styles.itemMorador,
-                      moradorSelecionado === m.id && styles.moradorSelecionado,
-                    ]}
-                    onPress={() => setMoradorSelecionado(m.id)}
-                  >
-                    <Text style={styles.nomeMorador}>
-                      {m.nome} {m.sobrenome}
-                    </Text>
-                    <Text style={styles.telefone}>{m.telefone}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            );
-          })}
-        </ScrollView>
-
-        <Text style={styles.label}>Origem da Encomenda</Text>
+        <Text style={styles.label}>Pesquisar morador (nome ou bloco)</Text>
         <TextInput
           style={styles.input}
-          placeholder="Ex: Shopee, Mercado Livre, Shein..."
+          placeholder="Ex: Maria ou bloco A"
+          value={filtro}
+          onChangeText={setFiltro}
+        />
+
+        <Text style={styles.label}>Selecionar Morador</Text>
+        <View style={{ maxHeight: 220 }}>
+          <FlatList
+            data={moradoresFiltraveis}
+            keyExtractor={(m) => String(m.id)}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                onPress={() => setSelectedMoradorId(String(item.id))}
+                style={[
+                  styles.moradorItem,
+                  selectedMoradorId === String(item.id) && styles.moradorItemSelected,
+                ]}
+              >
+                <Text style={{ fontWeight: "bold" }}>{item.nome} {item.sobrenome}</Text>
+                <Text style={{ color: "#475569" }}>Bloco {item.bloco} • Ap. {item.apartamento}</Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+
+        <Text style={styles.label}>Origem</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Ex: Shopee, Mercado Livre..."
           value={origem}
           onChangeText={setOrigem}
         />
 
-        <TouchableOpacity style={styles.botaoRegistrar} onPress={handleRegistrar}>
-          <Text style={styles.textoBotao}>Registrar Encomenda</Text>
+        <Text style={styles.label}>Descrição (opcional)</Text>
+        <TextInput
+          style={[styles.input, { height: 100 }]}
+          value={descricao}
+          onChangeText={setDescricao}
+          multiline
+        />
+
+        <TouchableOpacity style={styles.botao} onPress={salvar}>
+          <Text style={styles.textoBotao}>{editId ? "Salvar Alterações" : "Registrar Encomenda"}</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -168,67 +157,34 @@ export default function RegistrarEncomenda() {
 const styles = StyleSheet.create({
   container: { flex: 1, flexDirection: "row", backgroundColor: "#f8fafc" },
   areaConteudo: { flex: 1, padding: 20 },
-  titulo: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#0d47a1",
-    marginBottom: 5,
-  },
-  subtitulo: {
-    color: "#475569",
-    marginBottom: 15,
-  },
-  label: {
-    fontWeight: "600",
-    color: "#334155",
-    marginTop: 15,
-    marginBottom: 5,
-  },
-  listaMoradores: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    maxHeight: 250,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    marginBottom: 10,
-  },
-  blocoCard: { padding: 10, borderBottomWidth: 1, borderBottomColor: "#f1f5f9" },
-  tituloBloco: {
-    fontWeight: "bold",
-    color: "#0d47a1",
-    marginBottom: 5,
-  },
-  itemMorador: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: "#f1f5f9",
-    marginBottom: 6,
-  },
-  moradorSelecionado: {
-    backgroundColor: "#dbeafe",
-    borderColor: "#0d47a1",
-    borderWidth: 1,
-  },
-  nomeMorador: { fontWeight: "600", color: "#1e293b" },
-  telefone: { fontSize: 13, color: "#64748b" },
+  titulo: { fontSize: 22, fontWeight: "bold", color: "#0d47a1", marginBottom: 12 },
+  label: { fontWeight: "600", marginBottom: 6, color: "#334155" },
   input: {
     borderWidth: 1,
     borderColor: "#cbd5e1",
     borderRadius: 10,
     padding: 10,
+    marginBottom: 12,
     backgroundColor: "#fff",
-    marginBottom: 10,
   },
-  botaoRegistrar: {
+  moradorItem: {
+    backgroundColor: "#fff",
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#e6eef8",
+  },
+  moradorItemSelected: {
+    borderColor: "#1976d2",
+    backgroundColor: "#eaf3ff",
+  },
+  botao: {
     backgroundColor: "#0d47a1",
-    padding: 15,
-    borderRadius: 12,
+    padding: 14,
+    borderRadius: 10,
     alignItems: "center",
-    marginTop: 10,
+    marginTop: 6,
   },
-  textoBotao: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 16,
-  },
+  textoBotao: { color: "#fff", fontWeight: "600" },
 });

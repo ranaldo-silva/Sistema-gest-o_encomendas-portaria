@@ -6,7 +6,6 @@ export default function RedirectValidar() {
   const router = useRouter();
 
   useEffect(() => {
-    // Mantém compatibilidade com rota antiga, redireciona para a unificada
     router.replace("/validar-encomenda");
   }, []);
 

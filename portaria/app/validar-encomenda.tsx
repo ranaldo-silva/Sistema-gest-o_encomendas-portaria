@@ -4,6 +4,18 @@ import Sidebar from "../components/Sidebar";
 import { confirmarRetirada } from "../lib/storage";
 import { notify } from "../utils/notify";
 
+// ✅ Formata a hora local para o fuso horário de São Paulo (GMT-3)
+function formatarHoraLocal() {
+  const agora = new Date();
+  const opcoes: Intl.DateTimeFormatOptions = {
+    timeZone: "America/Sao_Paulo",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  };
+  return new Intl.DateTimeFormat("pt-BR", opcoes).format(agora);
+}
+
 export default function ValidarEncomenda() {
   const [token, setToken] = useState("");
   const [loading, setLoading] = useState(false);
@@ -13,8 +25,13 @@ export default function ValidarEncomenda() {
 
     try {
       setLoading(true);
+
       await confirmarRetirada(token.trim());
-      notify("✅ Sucesso", "Retirada confirmada com sucesso!");
+
+      // ✅ Mostra a hora exata de validação no fuso de Brasília
+      const hora = formatarHoraLocal();
+      notify("✅ Sucesso", `Retirada confirmada com sucesso às ${hora}.`);
+
       setToken("");
     } catch (err: any) {
       console.error(err);

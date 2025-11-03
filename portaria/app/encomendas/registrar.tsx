@@ -1,4 +1,3 @@
-// app/encomendas/registrar.tsx
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -22,6 +21,7 @@ import {
   Encomenda,
   Morador,
 } from "../../lib/storage";
+import { abrirWhatsApp } from "../../lib/whatsapp"; // ✅ novo utilitário
 
 export default function RegistrarEncomenda() {
   const router = useRouter();
@@ -71,24 +71,36 @@ export default function RegistrarEncomenda() {
   });
 
   async function salvar() {
-    if (!selectedMoradorId) return Alert.alert("Atenção", "Selecione um morador.");
+    if (!selectedMoradorId)
+      return Alert.alert("Atenção", "Selecione um morador.");
     if (!origem) return Alert.alert("Atenção", "Preencha a origem.");
+
     try {
+      let resultado: Encomenda;
+
       if (editId) {
-        await updateEncomenda(editId, {
+        resultado = await updateEncomenda(editId, {
           moradorId: Number(selectedMoradorId),
           origem,
           descricao,
         });
-        Anlert.alert("Sucesso", "Encomenda atualizada.");
+        Alert.alert("Sucesso", "Encomenda atualizada.");
       } else {
-        await saveEncomendas({
+        resultado = await saveEncomendas({
           moradorId: Number(selectedMoradorId),
           origem,
           descricao,
         });
         Alert.alert("Sucesso", "Encomenda registrada.");
+
+        // ✅ Após salvar, enviar notificação por WhatsApp
+        const morador = moradores.find((m) => m.id === Number(selectedMoradorId));
+        if (morador?.telefone) {
+          const mensagem = `📦 Olá ${morador.nome}! Sua encomenda (${origem}) chegou na portaria.\nToken: ${resultado.token}\nHorário: ${new Date().toLocaleString()}`;
+          abrirWhatsApp(morador.telefone, mensagem);
+        }
       }
+
       router.push("/");
     } catch (err: any) {
       console.error(err);
@@ -100,7 +112,9 @@ export default function RegistrarEncomenda() {
     <View style={styles.container}>
       <Sidebar />
       <ScrollView style={[styles.areaConteudo, isMobile && { padding: 16 }]}>
-        <Text style={styles.titulo}>{editId ? "Editar Encomenda" : "Registrar Encomenda"}</Text>
+        <Text style={styles.titulo}>
+          {editId ? "Editar Encomenda" : "Registrar Encomenda"}
+        </Text>
 
         <Text style={styles.label}>Pesquisar morador (nome ou bloco)</Text>
         <TextInput
@@ -120,11 +134,16 @@ export default function RegistrarEncomenda() {
                 onPress={() => setSelectedMoradorId(String(item.id))}
                 style={[
                   styles.moradorItem,
-                  selectedMoradorId === String(item.id) && styles.moradorItemSelected,
+                  selectedMoradorId === String(item.id) &&
+                    styles.moradorItemSelected,
                 ]}
               >
-                <Text style={{ fontWeight: "bold" }}>{item.nome} {item.sobrenome}</Text>
-                <Text style={{ color: "#475569" }}>Bloco {item.bloco} • Ap. {item.apartamento}</Text>
+                <Text style={{ fontWeight: "bold" }}>
+                  {item.nome} {item.sobrenome}
+                </Text>
+                <Text style={{ color: "#475569" }}>
+                  Bloco {item.bloco} • Ap. {item.apartamento}
+                </Text>
               </TouchableOpacity>
             )}
           />
@@ -147,7 +166,9 @@ export default function RegistrarEncomenda() {
         />
 
         <TouchableOpacity style={styles.botao} onPress={salvar}>
-          <Text style={styles.textoBotao}>{editId ? "Salvar Alterações" : "Registrar Encomenda"}</Text>
+          <Text style={styles.textoBotao}>
+            {editId ? "Salvar Alterações" : "Registrar Encomenda"}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </View>

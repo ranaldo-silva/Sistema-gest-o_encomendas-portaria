@@ -19,18 +19,25 @@ import {
 } from "../lib/storage";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { notify } from "../utils/notify";
+import { abrirWhatsApp } from "../lib/whatsapp"; // ✅ Novo import
 
-// 🔧 Helper: formata datas ISO → dd/mm/yyyy hh:mm
+// ✅ Corrigido — sempre mostra data/hora no fuso de São Paulo (GMT-3)
 function formatarData(iso?: string) {
   if (!iso) return "—";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "—";
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  const hh = String(d.getHours()).padStart(2, "0");
-  const min = String(d.getMinutes()).padStart(2, "0");
-  return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+  try {
+    const data = new Date(iso);
+    const opcoes: Intl.DateTimeFormatOptions = {
+      timeZone: "America/Sao_Paulo",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    };
+    return new Intl.DateTimeFormat("pt-BR", opcoes).format(data);
+  } catch {
+    return "—";
+  }
 }
 
 export default function Home() {
@@ -40,7 +47,6 @@ export default function Home() {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
-  // 🔄 Carregar dados da API
   async function carregar() {
     try {
       const moradores = await getMoradores();
@@ -68,7 +74,6 @@ export default function Home() {
     })
     .slice(0, 5);
 
-  // 🗑 Excluir encomenda
   async function confirmarExcluirEncomenda(id: string | number) {
     const ok =
       Platform.OS === "web"
@@ -181,6 +186,27 @@ export default function Home() {
                         onPress={() => confirmarExcluirEncomenda(item.id)}
                       >
                         <Text style={styles.actionText}>Excluir</Text>
+                      </TouchableOpacity>
+
+                      {/* ✅ NOVO botão WhatsApp */}
+                      <TouchableOpacity
+                        style={[
+                          styles.actionBtn,
+                          { marginLeft: 8, backgroundColor: "#25D366" },
+                        ]}
+                        onPress={() => {
+                          if (item.morador && item.morador.telefone) {
+                            const nome = `${item.morador.nome} ${item.morador.sobrenome || ""}`.trim();
+                            const msg = `Olá ${nome}! 📦\n\nSua encomenda de ${item.origem || "origem não informada"} chegou na portaria.\n\nToken para retirada: *${item.token}*.\n\nObrigado! 🏢`;
+                            abrirWhatsApp(item.morador.telefone, msg);
+                          } else {
+                            notify("Atenção", "O morador não possui telefone cadastrado.");
+                          }
+                        }}
+                      >
+                        <Text style={[styles.actionText, { color: "#fff" }]}>
+                          WhatsApp
+                        </Text>
                       </TouchableOpacity>
                     </View>
                   </View>

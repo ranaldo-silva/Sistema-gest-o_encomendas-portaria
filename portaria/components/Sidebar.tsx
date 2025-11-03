@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#0d47a1",
     alignItems: "center",
     justifyContent: "center",
-    zIndex: 50, // maior para sempre estar acima
+    zIndex: 50, 
   },
   hamburguerTexto: {
     color: "#fff",

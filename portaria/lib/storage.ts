@@ -96,7 +96,7 @@ export async function getEncomendas(): Promise<Encomenda[]> {
   }));
 }
 
-// ✅ NOVA: salvar encomenda
+// Salvar encomenda
 export async function saveEncomendas(encomenda: Partial<Encomenda>): Promise<Encomenda> {
   const res = await fetch(`${API_BASE_URL}/encomendas`, {
     method: "POST",
@@ -112,7 +112,7 @@ export async function saveEncomendas(encomenda: Partial<Encomenda>): Promise<Enc
   return await res.json();
 }
 
-// ✅ NOVA: atualizar encomenda
+// Atualizar encomenda
 export async function updateEncomenda(
   id: string | number,
   encomenda: Partial<Encomenda>

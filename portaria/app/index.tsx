@@ -19,9 +19,9 @@ import {
 } from "../lib/storage";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { notify } from "../utils/notify";
-import { abrirWhatsApp } from "../lib/whatsapp"; // ✅ Novo import
+import { abrirWhatsApp } from "../lib/whatsapp"; 
 
-// ✅ Corrigido — sempre mostra data/hora no fuso de São Paulo (GMT-3)
+// Mostra data/hora no fuso de São Paulo (GMT-3)
 function formatarData(iso?: string) {
   if (!iso) return "—";
   try {
@@ -188,7 +188,7 @@ export default function Home() {
                         <Text style={styles.actionText}>Excluir</Text>
                       </TouchableOpacity>
 
-                      {/* ✅ NOVO botão WhatsApp */}
+                      {/* botão WhatsApp */}
                       <TouchableOpacity
                         style={[
                           styles.actionBtn,

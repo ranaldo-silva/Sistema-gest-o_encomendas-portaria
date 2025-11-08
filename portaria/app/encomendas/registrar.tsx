@@ -21,7 +21,7 @@ import {
   Encomenda,
   Morador,
 } from "../../lib/storage";
-import { abrirWhatsApp } from "../../lib/whatsapp"; // ✅ novo utilitário
+import { abrirWhatsApp } from "../../lib/whatsapp"; 
 
 export default function RegistrarEncomenda() {
   const router = useRouter();
@@ -93,7 +93,7 @@ export default function RegistrarEncomenda() {
         });
         Alert.alert("Sucesso", "Encomenda registrada.");
 
-        // ✅ Após salvar, enviar notificação por WhatsApp
+        // Após salvar, enviar notificação por WhatsApp
         const morador = moradores.find((m) => m.id === Number(selectedMoradorId));
         if (morador?.telefone) {
           const mensagem = `📦 Olá ${morador.nome}! Sua encomenda (${origem}) chegou na portaria.\nToken: ${resultado.token}\nHorário: ${new Date().toLocaleString()}`;

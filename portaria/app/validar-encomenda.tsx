@@ -4,7 +4,7 @@ import Sidebar from "../components/Sidebar";
 import { confirmarRetirada } from "../lib/storage";
 import { notify } from "../utils/notify";
 
-// ✅ Formata a hora local para o fuso horário de São Paulo (GMT-3)
+// Formata a hora local para o fuso horário de São Paulo (GMT-3)
 function formatarHoraLocal() {
   const agora = new Date();
   const opcoes: Intl.DateTimeFormatOptions = {
@@ -28,7 +28,7 @@ export default function ValidarEncomenda() {
 
       await confirmarRetirada(token.trim());
 
-      // ✅ Mostra a hora exata de validação no fuso de Brasília
+      //  Mostra a hora exata de validação no fuso de Brasília
       const hora = formatarHoraLocal();
       notify("✅ Sucesso", `Retirada confirmada com sucesso às ${hora}.`);
 
